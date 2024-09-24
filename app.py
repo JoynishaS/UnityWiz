@@ -12,15 +12,14 @@ Settings.text_splitter = SentenceSplitter(chunk_size=500)
 Settings.embed_model = NVIDIAEmbedding(model = "NV-Embed-QA", truncate="END", api_key= st.secrets['NVIDIA_API_KEY'] )
 Settings.llm = NVIDIA(model = "meta/llama-3.1-70b-instruct")
 
-query_engine = None
+index = None
 progress = 0
 
 def loadUnityDocumentation():
     st.session_state['initialized'] = True
     filePath = "lablab.pdf"
-    index = None
     global progress
-    global query_engine
+    global index
     documents = []
     documents.extend(SimpleDirectoryReader(input_files=[filePath]).load_data())
 
@@ -40,34 +39,36 @@ def loadUnityDocumentation():
     #Create the index from the documents
     index = VectorStoreIndex.from_documents(documents,storage_context=storage_context)
 
-    #Create the query engine
-    query_engine = index.as_query_engine(similarity_top_k=20,streaming=True)
-    st.success("Successfully loaded documents from files.")
+    if 'query_engine' not in st.session_state:
+        #Create the query engine
+        st.session_state['query_engine'] = index.as_query_engine(similarity_top_k=20,streaming=True)
+        st.success("Successfully loaded documents from files.")
 
 #Function to handle chat interactions
 def chat(message):
-    global query_engine
-    if query_engine is None:
+    if st.session_state['query_engine'] is None:
         st.write( "UnityWiz is waiting for a question!")
     try:
-        st.session_state['response'] = query_engine.query(message)
-        st.write(message + st.session_state['response'])
+        st.session_state['response'] = st.session_state['query_engine'].query(message)
+        stream_response(st.session_state['response'])
     except Exception as e:
         st.error(f"Error proccessing query:{str(e)}")
 
 #Function to stream responses
 def stream_response(message):
-    global query_engine
-    if query_engine is None:
+    if st.session_state['query_engine'] is None:
         st.write("UnityWiz is waiting for a question!")
     try:
-        st.session_state['response'] = query_engine.query(message)
-        st.session_state['partial_response'] = ""
+        st.session_state['response'] = st.session_state['query_engine'].query(message)
+        full_response = ""
         for text in st.session_state['response'].response_gen:
-            st.session_state['partial_response'] += text
-            st.write(message + st.session_state['partial_response'])
+            full_response += text
+            st.session_state['full_response'] = full_response
     except Exception as e:
         st.error(f"Error proccessing query:{str(e)}")
+
+def updateTextArea():
+    response = st.session_state['full_response']
 
 #Load Unity Documentation
 if 'initialized' not in st.session_state:
@@ -81,10 +82,11 @@ st.header("UNITY WIZ!")
 msg = st.text_input("Ask me a question about Unity!")
 submit_btn = st.button("Submit")
 clear_btn = st.button("Clear")
-results = st.text_area("")
+
 
 if submit_btn:
-    results = stream_response(msg,chat(msg))
+    stream_response(msg)
+    results = st.text_area(st.session_state['full_response'])
 
 if clear_btn:
      results = ""
