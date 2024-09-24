@@ -5,6 +5,7 @@ from llama_index.embeddings.nvidia import NVIDIAEmbedding
 from llama_index.llms.nvidia import NVIDIA
 from llama_index.core.node_parser import SentenceSplitter
 from llama_index.core import Settings
+from time import sleep
 
 #Configure settings for the application
 Settings.text_splitter = SentenceSplitter(chunk_size=500)
@@ -12,13 +13,21 @@ Settings.embed_model = NVIDIAEmbedding(model = "NV-Embed-QA", truncate="END", ap
 Settings.llm = NVIDIA(model = "meta/llama-3.1-70b-instruct")
 
 query_engine = None
+progress = 0
 
 def loadUnityDocumentation():
-    filePath = "UnityDocumentation.pdf"
+    filePath = "lablab.pdf"
     index = None
+    global progress
     global query_engine
     documents = []
     documents.extend(SimpleDirectoryReader(input_files=[filePath]).load_data())
+
+    my_progress_bar = st.progress(0, "UnityWiz is loading up!")
+    for i in range(100):
+        sleep(0.1)  # Simulate a long-running task
+         # Update the progress bar
+        my_progress_bar.progress(i + 1, text= "Initializing UnityWiz!")
 
     if not documents:
         return f"There is no Unity Documentation PDF at this location"
@@ -78,7 +87,4 @@ if clear_btn:
 
 #Load Unity Documentation
 
-for i in range(100):
-    st.write(i)
-    st.progress(i+1,text="UnityWiz is loading")
-    loadUnityDocumentation()
+loadUnityDocumentation()
