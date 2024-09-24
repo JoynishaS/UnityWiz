@@ -16,6 +16,7 @@ query_engine = None
 progress = 0
 
 def loadUnityDocumentation():
+    st.session_state['initialized'] = True
     filePath = "lablab.pdf"
     index = None
     global progress
@@ -33,7 +34,7 @@ def loadUnityDocumentation():
         return f"There is no Unity Documentation PDF at this location"
 
     #Create a Milvus vector store and storage context
-    vector_store = MilvusVectorStore(uri="./milvus_unitywiz.db",dim=1024,overwrite=True)
+    vector_store = MilvusVectorStore(uri=st.secrets['ZILLZ_ENDPOINT_URI'],token=st.secrets['ZILLZ_API_KEY'],dim=1024,overwrite=True)
     storage_context = StorageContext.from_defaults(vector_store=vector_store)
 
     #Create the index from the documents
@@ -44,30 +45,33 @@ def loadUnityDocumentation():
     st.success("Successfully loaded documents from files.")
 
 #Function to handle chat interactions
-def chat(message,history):
+def chat(message):
     global query_engine
     if query_engine is None:
-        return history + "UnityWiz is waiting for a question!",None
+        st.write( "UnityWiz is waiting for a question!")
     try:
-        response = query_engine.query(message)
-        return history + message,response
+        st.session_state['response'] = query_engine.query(message)
+        st.write(message + st.session_state['response'])
     except Exception as e:
-        return history + message, f"Error proccessing query:{str(e)}"
+        st.error(f"Error proccessing query:{str(e)}")
 
 #Function to stream responses
-def stream_response(message, history):
+def stream_response(message):
     global query_engine
     if query_engine is None:
-        yield history + "UnityWiz is waiting for a question!",None
-        return
+        st.write("UnityWiz is waiting for a question!")
     try:
-        response = query_engine.query(message)
-        partial_response = ""
-        for text in response.response_gen:
-            partial_response += text
-            yield history +[(message,partial_response)]
+        st.session_state['response'] = query_engine.query(message)
+        st.session_state['partial_response'] = ""
+        for text in st.session_state['response'].response_gen:
+            st.session_state['partial_response'] += text
+            st.write(message + st.session_state['partial_response'])
     except Exception as e:
-        yield history + message, f"Error proccessing query:{str(e)}"
+        st.error(f"Error proccessing query:{str(e)}")
+
+#Load Unity Documentation
+if 'initialized' not in st.session_state:
+    loadUnityDocumentation()
 
 #interface
 with st.sidebar:
@@ -80,11 +84,7 @@ clear_btn = st.button("Clear")
 results = st.text_area("")
 
 if submit_btn:
-    results = stream_response(msg,chat(msg,""))
+    results = stream_response(msg,chat(msg))
 
 if clear_btn:
      results = ""
-
-#Load Unity Documentation
-
-loadUnityDocumentation()
