@@ -78,6 +78,7 @@ if clear_btn:
 
 #Load Unity Documentation
 
-for i in range(101):
-    st.progress(i)
+for i in range(100):
+    st.write(i)
+    st.progress(i+1,text="UnityWiz is loading")
     loadUnityDocumentation()
