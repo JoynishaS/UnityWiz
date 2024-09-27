@@ -1,43 +1,28 @@
 import streamlit as st
-from llama_index.core import SimpleDirectoryReader, VectorStoreIndex,StorageContext,load_index_from_storage
+from llama_index.core import SimpleDirectoryReader, VectorStoreIndex,StorageContext, ServiceContext,load_index_from_storage,GPTVectorStoreIndex
 from llama_index.vector_stores.milvus import MilvusVectorStore
 from llama_index.embeddings.nvidia import NVIDIAEmbedding
 from llama_index.llms.nvidia import NVIDIA
 from llama_index.core.node_parser import SentenceSplitter
 from llama_index.core import Settings
-from time import sleep
 
 #Configure settings for the application
-Settings.text_splitter = SentenceSplitter(chunk_size=500)
+Settings.text_splitter = SentenceSplitter(chunk_size=500,chunk_overlap=20)
 Settings.embed_model = NVIDIAEmbedding(model = "NV-Embed-QA", truncate="END", api_key= st.secrets['NVIDIA_API_KEY'] )
-Settings.llm = NVIDIA(model = "meta/llama-3.1-70b-instruct")
+Settings.llm = NVIDIA(model = "meta/llama-3.2-3b-instruct")
 
 index = None
 progress = 0
 
 def loadUnityDocumentation():
     st.session_state['initialized'] = True
-    filePath = "lablab.pdf"
-    global progress
-    global index
-    documents = []
-    documents.extend(SimpleDirectoryReader(input_files=[filePath]).load_data())
 
-    my_progress_bar = st.progress(0, "UnityWiz is loading up!")
-    for i in range(100):
-        sleep(0.1)  # Simulate a long-running task
-         # Update the progress bar
-        my_progress_bar.progress(i + 1, text= "Initializing UnityWiz!")
+    # Get Pre-existing Milvus vector store and storage context
+    vector_store = MilvusVectorStore(uri=st.secrets['ZILLZ_ENDPOINT_URI'], token=st.secrets['ZILLZ_API_KEY'], dim=1024,
+                                     collection_name="UnityDataCollection")
 
-    if not documents:
-        return f"There is no Unity Documentation PDF at this location"
-
-    #Create a Milvus vector store and storage context
-    vector_store = MilvusVectorStore(uri=st.secrets['ZILLZ_ENDPOINT_URI'],token=st.secrets['ZILLZ_API_KEY'],dim=1024,overwrite=True)
-    storage_context = StorageContext.from_defaults(vector_store=vector_store)
-
-    #Create the index from the documents
-    index = VectorStoreIndex.from_documents(documents,storage_context=storage_context)
+    # Create the indexed data from the vector_store
+    index = VectorStoreIndex.from_vector_store(vector_store)
 
     if 'query_engine' not in st.session_state:
         #Create the query engine
