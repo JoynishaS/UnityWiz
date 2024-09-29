@@ -57,7 +57,7 @@ def main():
 
     #Side Bar Interface
     with st.sidebar:
-        st.write("To chat with Unity Wiz ask them a question about Unity!")
+        st.write("Chat with the Wiz to learn about Unity!")
 
     #Chat Bot Interface
     st.title("UNITY WIZ!")
