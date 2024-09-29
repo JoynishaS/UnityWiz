@@ -11,8 +11,6 @@ Settings.text_splitter = SentenceSplitter(chunk_size=500,chunk_overlap=20)
 Settings.embed_model = NVIDIAEmbedding(model = "NV-Embed-QA", truncate="END", api_key= st.secrets['NVIDIA_API_KEY'] )
 Settings.llm = NVIDIA(model = "meta/llama-3.2-3b-instruct")
 
-index = None
-progress = 0
 
 def loadUnityDocumentation():
     st.session_state['initialized'] = True
@@ -22,12 +20,15 @@ def loadUnityDocumentation():
                                      collection_name="UnityDataCollection")
 
     # Create the indexed data from the vector_store
-    index = VectorStoreIndex.from_vector_store(vector_store)
+    if 'index' not in st.session_state:
+        st.session_state['index'] = VectorStoreIndex.from_vector_store(vector_store)
+
+    if 'history' not in st.session_state:
+        st.session_state['history'] = []
 
     if 'query_engine' not in st.session_state:
         #Create the query engine
-        st.session_state['query_engine'] = index.as_query_engine(similarity_top_k=20,streaming=True)
-        st.success("Successfully loaded documents from files.")
+        st.session_state['query_engine'] = st.session_state['index'].as_query_engine(similarity_top_k=20,streaming=True)
 
 #Function to handle chat interactions
 def chat(message):
@@ -52,9 +53,6 @@ def stream_response(message):
     except Exception as e:
         st.error(f"Error proccessing query:{str(e)}")
 
-def updateTextArea():
-    response = st.session_state['full_response']
-
 #Load Unity Documentation
 if 'initialized' not in st.session_state:
     loadUnityDocumentation()
@@ -63,15 +61,58 @@ if 'initialized' not in st.session_state:
 with st.sidebar:
     st.write("To chat with Unity Wiz ask them a question about Unity!")
 
-st.header("UNITY WIZ!")
-msg = st.text_input("Ask me a question about Unity!")
-submit_btn = st.button("Submit")
-clear_btn = st.button("Clear")
+col1 = st.columns([1])
 
+st.title("UNITY WIZ!")
 
-if submit_btn:
-    stream_response(msg)
-    results = st.text_area(st.session_state['full_response'])
+user_input = st.chat_input("Ask me a question about Unity!")
 
-if clear_btn:
-     results = ""
+#Display chat messages
+chat_container = st.container()
+with chat_container:
+    for message in st.session_state['history']:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
+
+if user_input:
+    with st.chat_message("user"):
+        st.markdown(user_input)
+    st.session_state['history'].append({"role":"user","content":user_input})
+    stream_response(user_input)
+
+    with st.chat_message("assistant"):
+        results = st.markdown(st.session_state['full_response'])
+    st.session_state['history'].append({"role": "assistant", "content": st.session_state['full_response']})
+
+#Move Clear Button to Bottom of Screen
+st.markdown(f"""
+  <style>
+  [class="st-emotion-cache-h23xut ef3psqc13"]{{
+    display: flex;
+    -webkit-box-align: center;
+    align-items: center;
+    -webkit-box-pack: center;
+    justify-content: center;
+    font-weight: 400;
+    padding: 0.25rem 0.75rem;
+    border-radius: 0.5rem;
+    min-height: 2.5rem;
+    margin-top: 5px;
+    line-height: 1.6;
+    color: inherit;
+    width: auto;
+    user-select: none;
+    background-color: rgb(29, 27, 27);
+    border: 1px solid rgba(241, 242, 245, 0.2);
+    position: fixed;
+    bottom:0;
+    z-index:9999;
+  }}
+  </style>
+"""
+            , unsafe_allow_html=True)
+
+if st.button("Clear"):
+    st.session_state['history'] = []
+    st.rerun()
+
