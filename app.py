@@ -40,7 +40,7 @@ def chat(message):
 
 #Function to get chat responses
 def stream_response(message):
-    with st.chat_message("assistant"):
+    with st.chat_message("assistant",avatar="spade.jpeg"):
         st.session_state['results'] = st.empty()
         full_response = ""
         st.session_state['response'] = st.session_state['query_engine'].query(message)
@@ -67,11 +67,15 @@ def main():
     chat_container = st.container()
     with chat_container:
         for message in st.session_state['history']:
-            with st.chat_message(message["role"]):
+            if message["role"] == "user":
+                avatar ="smiley.png"
+            else:
+                avatar = "spade.jpeg"
+            with st.chat_message(message["role"],avatar=avatar):
                 st.markdown(message["content"])
 
     if user_input:
-        with st.chat_message("user"):
+        with st.chat_message("user",avatar="smiley.png"):
             st.markdown(user_input)
         st.session_state['history'].append({"role":"user","content":user_input})
         stream_response(user_input)
