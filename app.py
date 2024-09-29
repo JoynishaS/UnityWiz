@@ -32,8 +32,6 @@ def loadUnityDocumentation():
 
 #Function to handle chat interactions
 def chat(message):
-    if st.session_state['query_engine'] is None:
-        st.write( "UnityWiz is waiting for a question!")
     try:
         st.session_state['response'] = st.session_state['query_engine'].query(message)
         stream_response(st.session_state['response'])
@@ -45,8 +43,6 @@ def stream_response(message):
     with st.chat_message("assistant"):
         st.session_state['results'] = st.empty()
         full_response = ""
-        if st.session_state['query_engine'] is None:
-            st.write("UnityWiz is waiting for a question!")
         st.session_state['response'] = st.session_state['query_engine'].query(message)
         for text in st.session_state['response'].response_gen:
             full_response += text
