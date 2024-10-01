@@ -5,6 +5,8 @@ from llama_index.embeddings.nvidia import NVIDIAEmbedding
 from llama_index.llms.nvidia import NVIDIA
 from llama_index.core.node_parser import SentenceSplitter
 from llama_index.core import Settings
+from sklearn.metrics.pairwise import cosine_similarity
+import numpy as np
 
 #Configure settings for the application
 Settings.text_splitter = SentenceSplitter(chunk_size=500,chunk_overlap=20)
@@ -28,15 +30,7 @@ def loadUnityDocumentation():
 
     if 'query_engine' not in st.session_state:
         #Create the query engine
-        st.session_state['query_engine'] = st.session_state['index'].as_query_engine(similarity_top_k=20,streaming=True)
-
-#Function to handle chat interactions
-def chat(message):
-    try:
-        st.session_state['response'] = st.session_state['query_engine'].query(message)
-        stream_response(st.session_state['response'])
-    except Exception as e:
-        st.error(f"Error processing query:{str(e)}")
+        st.session_state['query_engine'] = st.session_state['index'].as_query_engine(similarity_top_k=10,streaming=True,retriever_mode="embedding")
 
 #Function to get chat responses
 def stream_response(message):
@@ -48,7 +42,6 @@ def stream_response(message):
             full_response += text
             st.session_state['results'].markdown(full_response)
     st.session_state['history'].append({"role": "assistant", "content": full_response})
-
 
 def main():
     #Load Unity Documentation
@@ -79,6 +72,7 @@ def main():
             st.markdown(user_input)
         st.session_state['history'].append({"role":"user","content":user_input})
         stream_response(user_input)
+
 
     #Move Clear Button to Bottom of Screen
     st.markdown(f"""
