@@ -5,8 +5,7 @@ from llama_index.embeddings.nvidia import NVIDIAEmbedding
 from llama_index.llms.nvidia import NVIDIA
 from llama_index.core.node_parser import SentenceSplitter
 from llama_index.core import Settings
-from sklearn.metrics.pairwise import cosine_similarity
-import numpy as np
+import re
 
 #Configure settings for the application
 Settings.text_splitter = SentenceSplitter(chunk_size=500,chunk_overlap=20)
@@ -37,11 +36,80 @@ def stream_response(message):
     with st.chat_message("assistant",avatar="spade.jpeg"):
         st.session_state['results'] = st.empty()
         full_response = ""
-        st.session_state['response'] = st.session_state['query_engine'].query(message)
+        response_buffer = ""  # Buffer to accumulate text chunks
+
+        #Send query with the last 3 chat interactions
+        last_three = st.session_state['history'][-6:] if 'history' in st.session_state else []
+        chat_history_revised = ""
+        for item in last_three:
+            if (item['role'] == 'assistant'):
+                chat_history_revised +=(f"Original Answer:{item['content']}\n")
+
+        # Combine the user's current message with the chat history for the model to understand the context
+        query_input = chat_history_revised + f"\nNew Question:\nUser: {message}\nAssistant:"
+
+        print(query_input)
+
+        # Query the engine but only display the new response (not the query or history)
+        st.session_state['response'] = st.session_state['query_engine'].query(query_input)
+
+        # Stream the response and update the UI incrementally
         for text in st.session_state['response'].response_gen:
-            full_response += text
-            st.session_state['results'].markdown(full_response)
-    st.session_state['history'].append({"role": "assistant", "content": full_response})
+            response_buffer += text  # Collect the chunks in the buffer
+
+            # Only process when we detect multiple 'Original Answer:'s
+            if "Query:" in response_buffer or "Original Answer:" in response_buffer or '.' in response_buffer or "Rewrite:" in response_buffer :
+                # Check if there are multiple 'Original Answer:' instances
+                if response_buffer.count("Original Answer:") > 1:
+                    # Handle the case of multiple original answers
+                    response_buffer = remove_original_answers(response_buffer)
+
+                # Filter out everything between Query: and Original Answer:
+                response_buffer = filter_query(response_buffer)
+
+                # Only append the assistant's filtered answer
+                full_response += response_buffer
+                response_buffer = ""  # Reset the buffer after processing
+
+                # Update the UI with the latest filtered response
+                st.session_state['results'].markdown(full_response)
+
+        # Update session state with the new query and response pair
+        if 'history' not in st.session_state:
+            st.session_state['history'] = []
+        st.session_state['history'].append({'role': 'user', 'content': message})
+        #Submit the fill history to the history variable
+        st.session_state['history'].append({"role": "assistant", "content": full_response})
+
+
+# Function to filter out everything between "Query:" and "Original Answer:"
+def filter_query(response_text):
+    # Use regex to remove all text between 'Query:' and 'Original Answer:' or 'Rewrite:'
+    filtered_text = re.sub(r"Query:.*?(Original Answer:|Rewrite: |\?)", "", response_text, flags=re.DOTALL)
+
+    # Remove the 'Original Answer:' or 'Rewrite:' tag itself if needed
+    filtered_text = filtered_text.replace("Original Answer:", "").replace("Rewrite:", "").replace("?","")
+
+    return filtered_text
+
+# Function to handle multiple occurrences of 'Original Answer:'
+def remove_original_answers(response_text):
+    # This will handle the case where there are multiple "Original Answer:" occurrences
+    # Here, you can decide how to deal with multiple original answers (keep only the last one, etc.)
+
+    # Example: Keep only the last 'Original Answer:' and remove the others
+    parts = response_text.split("Original Answer:")
+
+    # Remove the query and previous original answers, only keep the last original answer
+    if len(parts) > 1:
+        response_text = "Original Answer:" + parts[-1]  # Keep only the last 'Original Answer:'
+
+
+    # Clean up by removing the 'Original Answer:' text
+    response_text = response_text.replace("Original Answer:", "")
+
+    return response_text
+
 
 def main():
     #Load Unity Documentation
@@ -70,9 +138,8 @@ def main():
     if user_input:
         with st.chat_message("user",avatar="smiley.png"):
             st.markdown(user_input)
-        st.session_state['history'].append({"role":"user","content":user_input})
+        #st.session_state['history'].append({"role":"user","content":user_input})
         stream_response(user_input)
-
 
     #Move Clear Button to Bottom of Screen
     st.markdown(f"""
