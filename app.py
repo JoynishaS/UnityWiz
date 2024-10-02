@@ -53,12 +53,15 @@ def stream_response(message):
         # Query the engine but only display the new response (not the query or history)
         st.session_state['response'] = st.session_state['query_engine'].query(query_input)
 
+        # Process larger chunks to avoid frequent processing on small pieces, speeding up the process
+        chunk_size = 500  # Adjust chunk size to process larger portions
+        chunk_accumulated = ""  # Accumulating chunks to reduce overhead
+
         # Stream the response and update the UI incrementally
         for text in st.session_state['response'].response_gen:
             response_buffer += text  # Collect the chunks in the buffer
 
-            # Only process when we detect multiple 'Original Answer:'s
-            if "Query:" in response_buffer or "Original Answer:" in response_buffer or '.' in response_buffer or "Rewrite:" in response_buffer :
+            if len(chunk_accumulated) >= chunk_size or "Query:" in response_buffer or "Original Answer:" in response_buffer or '.' in response_buffer or "Rewrite:" in response_buffer :
                 # Check if there are multiple 'Original Answer:' instances
                 if response_buffer.count("Original Answer:") > 1:
                     # Handle the case of multiple original answers
@@ -73,6 +76,9 @@ def stream_response(message):
 
                 # Update the UI with the latest filtered response
                 st.session_state['results'].markdown(full_response)
+
+            # Clear the chunk accumulator after processing
+            chunk_accumulated = ""
 
         # Update session state with the new query and response pair
         if 'history' not in st.session_state:
