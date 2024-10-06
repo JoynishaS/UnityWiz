@@ -8,7 +8,7 @@ from llama_index.core import Settings
 import re
 
 #Configure settings for the application
-Settings.text_splitter = SentenceSplitter(chunk_size=500,chunk_overlap=20)
+Settings.text_splitter = SentenceSplitter(chunk_size=1000,chunk_overlap=20)
 Settings.embed_model = NVIDIAEmbedding(model = "NV-Embed-QA", truncate="END", api_key= st.secrets['NVIDIA_API_KEY'] )
 Settings.llm = NVIDIA(model = "meta/llama-3.2-3b-instruct")
 
@@ -18,7 +18,7 @@ def loadUnityDocumentation():
 
     # Get Pre-existing Milvus vector store and storage context
     vector_store = MilvusVectorStore(uri=st.secrets['ZILLZ_ENDPOINT_URI'], token=st.secrets['ZILLZ_API_KEY'], dim=1024,
-                                     collection_name="UnityDataCollection")
+                                     collection_name="UnityDataCleanCollection")
 
     # Create the indexed data from the vector_store
     if 'index' not in st.session_state:
@@ -54,7 +54,7 @@ def stream_response(message):
         st.session_state['response'] = st.session_state['query_engine'].query(query_input)
 
         # Process larger chunks to avoid frequent processing on small pieces, speeding up the process
-        chunk_size = 500  # Adjust chunk size to process larger portions
+        chunk_size = 1000  # Adjust chunk size to process larger portions
         chunk_accumulated = ""  # Accumulating chunks to reduce overhead
 
         # Stream the response and update the UI incrementally
