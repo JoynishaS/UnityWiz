@@ -139,7 +139,7 @@ def stream_response(message):
             final_answer = generated_text.strip()
 
         # Accumulate the final answer into the buffer
-        response_buffer += final_answer
+        response_buffer += final_answer.replace("<|eot_id|>","")
 
         # Filter the query and original answer if needed
         if response_buffer.count("Original Answer:") > 1:
