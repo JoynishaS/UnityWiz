@@ -61,16 +61,16 @@ def check_for_token_id(generated_text, token_id=128009):
         print(f"Error in checking token ID: {response.status_code}")
 
 # Function to generate a response via Flask API on Google Cloud GPU
-def generate_response(question,continuation_text="Continue:", max_rounds=5, context_window=300):
+
+def generate_response(question):
     full_generated_text = ""
     global new_context
     new_context = ""
     current_context = question  # Start with the question only
-    rounds = 0
 
-    while rounds < max_rounds:
+    while True:
         # Send request to your Flask API running on the GPU instance
-        url = "http://34.95.153.148:8000/generate"   # Replace with actual server IP
+        url = "http://34.95.153.148:8000/generate"  # Replace with actual server IP
         payload = {"prompt": current_context}
         response = requests.post(url, json=payload)
 
@@ -79,15 +79,14 @@ def generate_response(question,continuation_text="Continue:", max_rounds=5, cont
             generated_text = response.json().get("generated_text", "")
             full_generated_text += generated_text
 
-            # Check if end of the generation is reached
+            # Check if the End of Document (EOD) token is reached
             if check_for_token_id(full_generated_text, 128009):  # Assuming 128009 is the EOD token
+                print("End of Document token found. Stopping generation.")
                 break
 
-            # Avoid repetition by trimming the previously generated text, keeping only the last part for context
-            new_context = (full_generated_text)[-context_window:]  # Keep only the last part of the answer
-            current_context = "finish answering the question from this context" + new_context  # Set continuation hint
+            # Update the context with the new generated text for the next round
+            current_context = full_generated_text
 
-            rounds += 1
         else:
             return "Error in generation."
 
@@ -123,11 +122,11 @@ def stream_response(message):
         print(search_output)
 
         prompt = f"""
-        You are an expert Unity assistant who provides technical explanations with relevant Unity code snippets where applicable.
-        Provide a detailed technical answer to the question based on the following context:
+        You are an expert Unity assistant who provides technical explanations with relevant Unity C# code snippets where applicable.
+        Provide a concise technical answer to the question based on the following context:
         Question: {message}
         Context: {search_output}
-        Include relevant Unity code snippets if applicable.
+        Always include Unity C# code snippets where applicable to clarify the technical explanation. Keep your answer short and structured.
 
         Answer:
         """
