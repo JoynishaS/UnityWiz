@@ -92,9 +92,9 @@ def generate_response(question):
 
     return full_generated_text
 
-
 def stream_response(message):
     with st.chat_message("assistant", avatar="spade.jpeg"):
+        # Initialize or clear the result container
         st.session_state['results'] = st.empty()
         full_response = ""
         response_buffer = ""  # Buffer to accumulate text chunks
@@ -114,10 +114,7 @@ def stream_response(message):
 
         # Collect all chunks in a list and join them with spaces
         chunks = [chunk.strip() for chunk in st.session_state['response'].response_gen]
-        search_output = " ".join(chunks) + " "
-
-        # Remove any multiple spaces that may have accumulated
-        search_output = re.sub(r'\s+', ' ', search_output).strip()
+        search_output = " ".join(chunks).strip()
 
         print(search_output)
 
@@ -141,19 +138,21 @@ def stream_response(message):
             # If the "assistant:" label isn't found, just show the entire response
             final_answer = generated_text.strip()
 
-        # Process and display the response incrementally
-        chunk_size = 1000
-        chunk_accumulated = ""
+        # Accumulate the final answer into the buffer
         response_buffer += final_answer
 
-        # Filtering and chunking logic
-        if len(chunk_accumulated) >= chunk_size or "Query:" in response_buffer or "Original Answer:" in response_buffer or '.' in response_buffer or "Rewrite:" in response_buffer:
-            if response_buffer.count("Original Answer:") > 1:
-                response_buffer = remove_original_answers(response_buffer)
-            response_buffer = filter_query(response_buffer)
-            full_response += response_buffer
-            response_buffer = ""
-            st.session_state['results'].markdown(full_response)
+        # Filter the query and original answer if needed
+        if response_buffer.count("Original Answer:") > 1:
+            response_buffer = remove_original_answers(response_buffer)
+
+        # Filter any unwanted parts in the response
+        response_buffer = filter_query(response_buffer)
+
+        # Add the response to the full response string
+        full_response += response_buffer
+
+        # Instead of handling code separately, we treat everything as markdown
+        st.session_state['results'].markdown(fix_code_markdown(full_response))
 
         # Update session state with the new interaction
         if 'history' not in st.session_state:
@@ -162,9 +161,20 @@ def stream_response(message):
         st.session_state['history'].append({'role': 'assistant', 'content': full_response})
 
 
+def fix_code_markdown(text):
+    """
+    Fix any code blocks in the response by ensuring code blocks are formatted as Markdown.
+    This function looks for `csharp` blocks and ensures they are wrapped in triple backticks.
+    """
+    # Replace code sections using backticks and proper Markdown format
+    text = re.sub(r'(```csharp[\s\S]*?```)', r'\n\1\n', text)  # Ensure code blocks have correct spacing
+    text = re.sub(r'(```markdown[\s\S]*?```)', r'\n\1\n', text)  # Ensure code blocks have correct spacing
+    return text
+
+
 # Function to filter out everything between "Query:" and "Original Answer:"
 def filter_query(response_text):
-    filtered_text = re.sub(r"Query:.*?(Original Answer:|Rewrite: |\?)", "", response_text, flags=re.DOTALL)
+    filtered_text = re.sub(r"Query:.*?(Original Answer:|Rewrite:|\?)", "", response_text, flags=re.DOTALL)
     filtered_text = filtered_text.replace("Original Answer:", "").replace("Rewrite:", "").replace("?", "")
     return filtered_text
 
@@ -175,7 +185,6 @@ def remove_original_answers(response_text):
         response_text = "Original Answer:" + parts[-1]  # Keep only the last 'Original Answer:'
     response_text = response_text.replace("Original Answer:", "")
     return response_text
-
 
 def main():
     #Load Unity Documentation
@@ -199,11 +208,11 @@ def main():
             else:
                 avatar = "spade.jpeg"
             with st.chat_message(message["role"],avatar=avatar):
-                st.markdown(message["content"])
+                st.markdown(message["content"],unsafe_allow_html=True)
 
     if user_input:
         with st.chat_message("user",avatar="smiley.png"):
-            st.markdown(user_input)
+            st.markdown(user_input,unsafe_allow_html=True)
         #st.session_state['history'].append({"role":"user","content":user_input})
         stream_response(user_input)
 
