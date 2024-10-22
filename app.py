@@ -10,7 +10,6 @@ import requests
 #Configure settings for the application
 Settings.text_splitter = SentenceSplitter(chunk_size=1000,chunk_overlap=20)
 Settings.embed_model = NVIDIAEmbedding(model = "NV-Embed-QA", truncate="END", api_key= st.secrets['NVIDIA_API_KEY'] )
-Settings.llm = None  # Disable all LLM-based functionality
 
 st.set_page_config(layout="wide")
 
