@@ -11,7 +11,7 @@ import requests
 #Configure settings for the application
 Settings.text_splitter = SentenceSplitter(chunk_size=1000,chunk_overlap=20)
 Settings.embed_model = NVIDIAEmbedding(model = "NV-Embed-QA", truncate="END", api_key= st.secrets['NVIDIA_API_KEY'] )
-st.set_page_config(layout="wide")
+st.set_page_config(layout="wide", page_title="Unity Wiz")
 
 
 def loadUnityDocumentation():
@@ -195,6 +195,7 @@ def main():
     #Side Bar Interface
     with st.sidebar:
         st.write("Chat with the Wiz to learn about Unity!")
+        st.image("logo.png")
 
     #Chat Bot Interface
     st.title("UNITY WIZ!")
