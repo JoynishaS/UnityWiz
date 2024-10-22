@@ -35,7 +35,7 @@ def loadUnityDocumentation():
     if 'query_engine' not in st.session_state:
         # Create the query engine
         st.session_state['query_engine'] = st.session_state['index'].as_query_engine(
-            similarity_top_k=10, streaming=True, retriever_mode="embedding"
+            similarity_top_k=10, streaming=True, retriever_mode="embedding",llm=None
         )
 
 def check_for_token_id(generated_text, token_id=128009):
