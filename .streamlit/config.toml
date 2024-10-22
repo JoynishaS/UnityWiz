@@ -1,0 +1,14 @@
+[theme]
+primaryColor="#f90833"
+backgroundColor="#161414"
+secondaryBackgroundColor="#00040a"
+textColor="#f1f2f5"
+font="monospace"
+
+[server]
+enableStaticServing = true
+
+[client]
+showSidebarNavigation = false
+
+
