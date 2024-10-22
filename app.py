@@ -169,7 +169,9 @@ def fix_code_markdown(text):
     """
     # Replace code sections using backticks and proper Markdown format
     text = re.sub(r'(```csharp[\s\S]*?```)', r'\n\1\n', text)  # Ensure code blocks have correct spacing
-    text = re.sub(r'(```markdown[\s\S]*?```)', r'\n\1\n', text)  # Ensure code blocks have correct spacing
+    text = re.sub(r'(```markdown[\s\S]*?```)', r'\n\1\n', text) # Ensure code blocks have correct spacing
+    text = re.sub(r'(```[\s\S]*?```)', r'\n\1\n', text)
+    text = re.sub(r'(?<!`)({[\s\S]*?})', r'```\n\1\n```', text)
     return text
 
 
