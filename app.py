@@ -6,17 +6,15 @@ from llama_index.core.node_parser import SentenceSplitter
 from llama_index.core import Settings
 import re
 import requests
-import sys
-
 
 #Configure settings for the application
 Settings.text_splitter = SentenceSplitter(chunk_size=1000,chunk_overlap=20)
 Settings.embed_model = NVIDIAEmbedding(model = "NV-Embed-QA", truncate="END", api_key= st.secrets['NVIDIA_API_KEY'] )
 
-st.write(f"Python version: {sys.version}")
+st.set_page_config(layout="wide")
+
 
 def loadUnityDocumentation():
-    st.set_page_config(layout="wide")
     st.session_state['initialized'] = True
 
     # Get pre-existing Milvus vector store and set up storage context
