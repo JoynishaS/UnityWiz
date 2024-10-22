@@ -40,7 +40,7 @@ def loadUnityDocumentation():
         st.session_state['query_engine'].llm = None
 
 def check_for_token_id(generated_text, token_id=128009):
-    url = "http://34.95.153.148:8000/check_token_id"  # Flask server endpoint
+    url = 'FLASK_URI'  # Flask server endpoint
     payload = {
         "generated_text": generated_text,
         "token_id": token_id
