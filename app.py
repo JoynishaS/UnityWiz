@@ -1,32 +1,17 @@
 import streamlit as st
-from llama_index.core import SimpleDirectoryReader, VectorStoreIndex,StorageContext, ServiceContext,load_index_from_storage,GPTVectorStoreIndex
+from llama_index.core import  VectorStoreIndex
 from llama_index.vector_stores.milvus import MilvusVectorStore
 from llama_index.embeddings.nvidia import NVIDIAEmbedding
-from llama_index.llms.nvidia import NVIDIA
 from llama_index.core.node_parser import SentenceSplitter
 from llama_index.core import Settings
 import re
-import torch
-from transformers import AutoTokenizer, AutoModelForCausalLM
-from transformers import pipeline
+import requests
+
 
 #Configure settings for the application
 Settings.text_splitter = SentenceSplitter(chunk_size=1000,chunk_overlap=20)
 Settings.embed_model = NVIDIAEmbedding(model = "NV-Embed-QA", truncate="END", api_key= st.secrets['NVIDIA_API_KEY'] )
 
-# Load your model and tokenizer
-model_path = "./llama-finetuned-test-unity"
-tokenizer = AutoTokenizer.from_pretrained(model_path)
-model = AutoModelForCausalLM.from_pretrained(model_path,torch_dtype=torch.float16)
-
-# Make sure the model is in evaluation mode
-model.eval()
-
-# Move the model to the appropriate device (GPU if available)
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-model.to(device)
-# Use torch.compile to optimize the model
-compiled_model = torch.compile(model)
 
 def loadUnityDocumentation():
     st.set_page_config(layout="wide")
@@ -53,8 +38,63 @@ def loadUnityDocumentation():
             similarity_top_k=10, streaming=True, retriever_mode="embedding"
         )
 
+def check_for_token_id(generated_text, token_id=128009):
+    url = "http://34.95.153.148:8000/check_token_id"  # Flask server endpoint
+    payload = {
+        "generated_text": generated_text,
+        "token_id": token_id
+    }
+
+    response = requests.post(url, json=payload)
+
+    if response.status_code == 200:
+        result = response.json()
+        tokens = result.get("tokens", [])
+        print(f"Token IDs for the generated text: {tokens}")
+        print(result)
+        if result.get('token_present'):
+            print(f"Token ID {token_id} is present in the generated text.")
+            return True
+        else:
+            print(f"Token ID {token_id} is not present in the generated text.")
+    else:
+        print(f"Error in checking token ID: {response.status_code}")
+
+# Function to generate a response via Flask API on Google Cloud GPU
+
+def generate_response(question):
+    full_generated_text = ""
+    global new_context
+    new_context = ""
+    current_context = question  # Start with the question only
+
+    while True:
+        # Send request to your Flask API running on the GPU instance
+        url = "http://34.95.153.148:8000/generate"  # Replace with actual server IP
+        payload = {"prompt": current_context}
+        response = requests.post(url, json=payload)
+
+        # Handle the API response
+        if response.status_code == 200:
+            generated_text = response.json().get("generated_text", "")
+            full_generated_text += generated_text
+
+            # Check if the End of Document (EOD) token is reached
+            if check_for_token_id(full_generated_text, 128009):  # Assuming 128009 is the EOD token
+                print("End of Document token found. Stopping generation.")
+                break
+
+            # Update the context with the new generated text for the next round
+            current_context = full_generated_text
+
+        else:
+            return "Error in generation."
+
+    return full_generated_text
+
 def stream_response(message):
     with st.chat_message("assistant", avatar="spade.jpeg"):
+        # Initialize or clear the result container
         st.session_state['results'] = st.empty()
         full_response = ""
         response_buffer = ""  # Buffer to accumulate text chunks
@@ -74,43 +114,20 @@ def stream_response(message):
 
         # Collect all chunks in a list and join them with spaces
         chunks = [chunk.strip() for chunk in st.session_state['response'].response_gen]
-        search_output = " ".join(chunks) + " "
-
-        # Remove any multiple spaces that may have accumulated
-        search_output = re.sub(r'\s+', ' ', search_output).strip()
+        search_output = " ".join(chunks).strip()
 
         print(search_output)
 
         prompt = f"""
-        You are an expert Unity assistant who provides technical explanations with relevant Unity code snippets where applicable.
-        Provide a detailed technical answer to the question based on the following context:
+        You are an expert Unity assistant who provides technical explanations with relevant Unity C# code snippets where applicable.
+        Provide a concise technical answer to the question based on the following context:
         Question: {message}
         Context: {search_output}
-        Include relevant Unity code snippets if applicable.
+        Always include Unity C# code snippets where applicable to clarify the technical explanation. Keep your answer short and structured.
 
         Answer:
         """
-
-        # Use the tokenizer separately to prepare inputs with truncation
-        inputs = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=512).to(device)
-
-        with torch.no_grad():
-            # Generate text
-            output_ids = compiled_model.generate(
-                input_ids=inputs["input_ids"],
-                attention_mask=inputs["attention_mask"],
-                max_new_tokens=100,  # Controls total output length
-                #max_length=inputs["input_ids"].shape[1] + 100,  # Limit max_length accordingly
-                num_return_sequences=1,
-                pad_token_id=model.config.pad_token_id,
-                do_sample=True,
-                top_k=30,
-                top_p=0.9,
-                temperature=0.8,
-                repetition_penalty=1.2,  # Discourages exact repetition
-            )
-        # Decode and print the generated text, excluding the prompt from the result
-        generated_text = tokenizer.decode(output_ids[0], skip_special_tokens=True)
+        generated_text = generate_response(prompt)
 
         # Find the start of the assistant's answer
         answer_start = generated_text.find("Answer:")
@@ -121,19 +138,21 @@ def stream_response(message):
             # If the "assistant:" label isn't found, just show the entire response
             final_answer = generated_text.strip()
 
-        # Process and display the response incrementally
-        chunk_size = 1000
-        chunk_accumulated = ""
-        response_buffer += final_answer
+        # Accumulate the final answer into the buffer
+        response_buffer += final_answer.replace("<|eot_id|>","")
 
-        # Filtering and chunking logic
-        if len(chunk_accumulated) >= chunk_size or "Query:" in response_buffer or "Original Answer:" in response_buffer or '.' in response_buffer or "Rewrite:" in response_buffer:
-            if response_buffer.count("Original Answer:") > 1:
-                response_buffer = remove_original_answers(response_buffer)
-            response_buffer = filter_query(response_buffer)
-            full_response += response_buffer
-            response_buffer = ""
-            st.session_state['results'].markdown(full_response)
+        # Filter the query and original answer if needed
+        if response_buffer.count("Original Answer:") > 1:
+            response_buffer = remove_original_answers(response_buffer)
+
+        # Filter any unwanted parts in the response
+        response_buffer = filter_query(response_buffer)
+
+        # Add the response to the full response string
+        full_response += response_buffer
+
+        # Instead of handling code separately, we treat everything as markdown
+        st.session_state['results'].markdown(fix_code_markdown(full_response))
 
         # Update session state with the new interaction
         if 'history' not in st.session_state:
@@ -141,9 +160,21 @@ def stream_response(message):
         st.session_state['history'].append({'role': 'user', 'content': message})
         st.session_state['history'].append({'role': 'assistant', 'content': full_response})
 
+
+def fix_code_markdown(text):
+    """
+    Fix any code blocks in the response by ensuring code blocks are formatted as Markdown.
+    This function looks for `csharp` blocks and ensures they are wrapped in triple backticks.
+    """
+    # Replace code sections using backticks and proper Markdown format
+    text = re.sub(r'(```csharp[\s\S]*?```)', r'\n\1\n', text)  # Ensure code blocks have correct spacing
+    text = re.sub(r'(```markdown[\s\S]*?```)', r'\n\1\n', text)  # Ensure code blocks have correct spacing
+    return text
+
+
 # Function to filter out everything between "Query:" and "Original Answer:"
 def filter_query(response_text):
-    filtered_text = re.sub(r"Query:.*?(Original Answer:|Rewrite: |\?)", "", response_text, flags=re.DOTALL)
+    filtered_text = re.sub(r"Query:.*?(Original Answer:|Rewrite:|\?)", "", response_text, flags=re.DOTALL)
     filtered_text = filtered_text.replace("Original Answer:", "").replace("Rewrite:", "").replace("?", "")
     return filtered_text
 
@@ -154,7 +185,6 @@ def remove_original_answers(response_text):
         response_text = "Original Answer:" + parts[-1]  # Keep only the last 'Original Answer:'
     response_text = response_text.replace("Original Answer:", "")
     return response_text
-
 
 def main():
     #Load Unity Documentation
@@ -178,11 +208,11 @@ def main():
             else:
                 avatar = "spade.jpeg"
             with st.chat_message(message["role"],avatar=avatar):
-                st.markdown(message["content"])
+                st.markdown(message["content"],unsafe_allow_html=True)
 
     if user_input:
         with st.chat_message("user",avatar="smiley.png"):
-            st.markdown(user_input)
+            st.markdown(user_input,unsafe_allow_html=True)
         #st.session_state['history'].append({"role":"user","content":user_input})
         stream_response(user_input)
 
