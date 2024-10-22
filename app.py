@@ -40,7 +40,7 @@ def loadUnityDocumentation():
         st.session_state['query_engine'].llm = None
 
 def check_for_token_id(generated_text, token_id=128009):
-    url = st.secrets['FLASK_URI']  # Flask server endpoint
+    url = st.secrets['FLASK_URI_CHECK_TOKEN']  # Flask server endpoint
     payload = {
         "generated_text": generated_text,
         "token_id": token_id
@@ -71,7 +71,7 @@ def generate_response(question):
 
     while True:
         # Send request to your Flask API running on the GPU instance
-        url = "http://34.95.153.148:8000/generate"  # Replace with actual server IP
+        url = st.secrets['FLASK_URI_GENERATE']  # Replace with actual server IP
         payload = {"prompt": current_context}
         response = requests.post(url, json=payload)
 
