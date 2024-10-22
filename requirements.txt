@@ -19,6 +19,5 @@ llama-index-program-openai==0.2.0
 llama-index-question-gen-openai==0.2.0
 llama-index-readers-file==0.2.2
 llama-index-readers-llama-parse==0.3.0
-llama-index-readers-pinecone==0.1.4
 llama-index-vector-stores-milvus==0.2.4
 llama-parse==0.5.6
