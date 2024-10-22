@@ -33,10 +33,11 @@ def loadUnityDocumentation():
     if 'history' not in st.session_state:
         st.session_state['history'] = []
     if 'query_engine' not in st.session_state:
-        # Create the query engine
         st.session_state['query_engine'] = st.session_state['index'].as_query_engine(
             similarity_top_k=10, streaming=True, retriever_mode="embedding"
         )
+        # Manually ensure no LLM is used
+        st.session_state['query_engine'].llm = None
 
 def check_for_token_id(generated_text, token_id=128009):
     url = "http://34.95.153.148:8000/check_token_id"  # Flask server endpoint
