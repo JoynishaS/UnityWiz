@@ -5,12 +5,13 @@ from llama_index.embeddings.nvidia import NVIDIAEmbedding
 from llama_index.core.node_parser import SentenceSplitter
 from llama_index.core import Settings
 import re
+import llama_index
 import requests
 
 #Configure settings for the application
 Settings.text_splitter = SentenceSplitter(chunk_size=1000,chunk_overlap=20)
 Settings.embed_model = NVIDIAEmbedding(model = "NV-Embed-QA", truncate="END", api_key= st.secrets['NVIDIA_API_KEY'] )
-
+llama_index.llms.default_llm = None
 st.set_page_config(layout="wide")
 
 
@@ -40,7 +41,7 @@ def loadUnityDocumentation():
         st.session_state['query_engine'].llm = None
 
 def check_for_token_id(generated_text, token_id=128009):
-    url = 'FLASK_URI'  # Flask server endpoint
+    url = st.secrets['FLASK_URI']  # Flask server endpoint
     payload = {
         "generated_text": generated_text,
         "token_id": token_id
